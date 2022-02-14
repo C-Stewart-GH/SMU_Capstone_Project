@@ -1,5 +1,5 @@
 import json
-f = open('C:\\Users\\mmaze\\Desktop\\capstone\\response_1644436290851.json')
+f = open('/Users/cameron/Documents/SMU_DS/Capstone/SMU_Capstone_Project/Raw Data/Match Data/response_1644436290851.json')
 data = json.load(f)
 json.dumps(data, indent=4, sort_keys=True)
 f.close()
@@ -55,10 +55,6 @@ if data[0].get('divisions')[0].get('matches')[0].get("games")[0].get("winner") =
 db.ratingDict
 
 
-
-
-
-
 # Loop through every match for the first division/tournament
 db = Elo(k = 20)
 db.ratingDict
@@ -85,8 +81,6 @@ for match in data[0].get('divisions')[0].get('matches'):
         db.gameOver(home_team, away_team, True)
     if match.get("games")[-1].get("winner") == "away":
         db.gameOver(away_team, home_team, 0)
-
-
 
 
 
@@ -167,15 +161,30 @@ db.ratingDict
 
 # Final Iteration:
 import json
-data = []
-files = ("response_1644436290851", "response_1644440709253", "response_1644441792389", "response_1644442447886", 
-        "response_1644442790238", "response_1644443625440", "response_1644443982331", "response_1644444904630",
-        "response_1644445287060", "response_1644501077799", "response_1644506880307", "response_1644513456239",
-        "response_1644518421315", "response_1644520499779")
-for i in files:
-    f = open('C:\\Users\\mmaze\\Desktop\\capstone\\batched_data\\' + i + '.json')
-    data.extend(json.load(f))
-    f.close()
+# data = []
+# files = ("response_1644436290851", "response_1644440709253", "response_1644441792389", "response_1644442447886", 
+#         "response_1644442790238", "response_1644443625440", "response_1644443982331", "response_1644444904630",
+#         "response_1644445287060", "response_1644501077799", "response_1644506880307", "response_1644513456239",
+#         "response_1644518421315", "response_1644520499779")
+# for i in files:
+#     f = open('C:\\Users\\mmaze\\Desktop\\capstone\\batched_data\\' + i + '.json')
+#     data.extend(json.load(f))
+#     f.close()
+
+#Read in path names into a list
+directory = os.fsencode('/Users/cameron/Documents/SMU_DS/Capstone/SMU_Capstone_Project/Raw Data/Match Data/')
+file_path_holder=[]
+for file in os.listdir(directory):
+     filename = os.fsdecode(file)
+     if filename.endswith(".json"): 
+         file_path_holder.append(str(directory)[2:-1] + str(filename))
+
+#Extend contents of all files into a list
+data=[]
+for path in file_path_holder:
+    file=open(path)
+    data.extend(json.load(file))
+    file.close()
 
 from elosports.elo import Elo
 db = Elo(k = 20)
@@ -227,3 +236,4 @@ min(db.ratingDict.values())
 sum(db.ratingDict.values())/len(db.ratingDict.values())
 max(db.ratingDict.values())
 
+db.ratingDict.values()
