@@ -177,22 +177,22 @@ vball[1]['tournament_name']
 vball[['tournament_name','type']][1]
 
 #Need to sort by date before I can work on below code copied from Michael
-db = Elo(k = 20)
+# db = Elo(k = 20)
 
-db.addPlayer(home_team)
-db.addPlayer(away_team)
-db.gameOver(home_team, away_team, True)
-len(db.ratingDict)
-min(db.ratingDict.values())
-sum(db.ratingDict.values())/len(db.ratingDict.values())
-max(db.ratingDict.values())
+# db.addPlayer(home_team)
+# db.addPlayer(away_team)
+# db.gameOver(home_team, away_team, True)
+# len(db.ratingDict)
+# min(db.ratingDict.values())
+# sum(db.ratingDict.values())/len(db.ratingDict.values())
+# max(db.ratingDict.values())
 
-db.ratingDict.values()
+# db.ratingDict.values()
 
-if match.get("games")[-1].get("winner") == "home": # -1 bc we assume the last winner listed won the overall match
-    db.gameOver(home_team, away_team, True)
-if match.get("games")[-1].get("winner") == "away":
-    db.gameOver(away_team, home_team, 0)
+# if match.get("games")[-1].get("winner") == "home": # -1 bc we assume the last winner listed won the overall match
+#     db.gameOver(home_team, away_team, True)
+# if match.get("games")[-1].get("winner") == "away":
+#     db.gameOver(away_team, home_team, 0)
     
     
     
