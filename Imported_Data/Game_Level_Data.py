@@ -3,6 +3,7 @@ import os
 import numpy as np
 from elosports.elo import Elo
 from collections import Counter
+from datetime import datetime as dt
 
 # Read in path names into a list
 directory = os.fsencode(
@@ -30,8 +31,9 @@ for path in file_path_holder:
 import copy
 clean_vball_data = copy.deepcopy(full_vball_data)
 clean_vball_data[0]["divisions"][0]['googleLocation'][0]
-clean_vball_data[0]['tournament'][0].keys()
-clean_vball_data[0]["divisions"][0]['ageType']
+clean_vball_data[0]['tournament']
+clean_vball_data[0].keys()
+clean_vball_data[0]["divisions"][0]['timeZoneName']
 
 
 # Change playerProfileIds to playerIds for consistency and count number of changes
@@ -52,7 +54,7 @@ len(key_changes)
 # 36,986 matches for 'Girls' and 'Juniors'
 # 36,272 matches that are 2 vs 2
 # Warning: 1312 matches are missing scores
-# 188,104 games recorded
+# 173,080 rows recorded (each game appears 4 times)
 clean_vball_games = []
 for tournaments in clean_vball_data:
     for divisions in tournaments.get("divisions"):
@@ -96,7 +98,6 @@ for tournaments in clean_vball_data:
                                     row_holder.append(game_number)                      #Game Number in Series
                                     row_holder.append(matches.get('type'))              #Match Type (Pool or Bracket)
                                     row_holder.append(matches.get('isMatch'))           #Best of Match (T/F Is the match a best of 3, 5, or 7)
-                                    row_holder.append(matches.get('dateTime'))          #Match DateTime (format: 2018-07-10T09:00:00Z)
                                     row_holder.append(player)                           #Player ID
                                     if player == side[0]:                               #Teammate ID
                                         row_holder.append(side[1]) 
@@ -124,9 +125,16 @@ for tournaments in clean_vball_data:
                                     row_holder.append(divisions.get('latitude'))        #Latitude
                                     row_holder.append(divisions.get('longitude'))       #Longitude
                                     row_holder.append(divisions.get('timeZoneName'))    #Time Zone Name
+                                    
+                                    #Convert datetimes (could be more efficient by moving dt_holder outside of loop)
+                                    #dt_holder=dt.strptime(matches.get('dateTime'),'%Y-%m-%dT%H:%M:%S%z')
+                                    # row_holder.append(dt_holder)               #Datetime
+                                    # row_holder.append(dt.date(dt_holder))      #Date
+                                    # row_holder.append(dt.time(dt_holder))      #Time
+                                    row_holder.append(np.datetime64(matches.get('dateTime')[0:-1]))   #Datetime
                                     #row_holder.append(divisions.get('googleLocation')) #GoogleLocation
                                     clean_vball_games.append(row_holder)
-                            
+
 len(clean_vball_games)
 
 #Covert to list of tuples (for structured array later)
@@ -149,16 +157,17 @@ np.finfo(float) #same as np.float64
 #f4 = 32 bit float
 #M = datetime format
 vball_coltypes=[('tournament_name','U200'), ('type', 'U200'), ('division', 'U200'), ('gender', 'U200'), ('age_type', 'U200'), 
-                ('match_id', 'i4'), ('series_number', 'i4'), ('match_type', 'U200'), ('isMatch', '?'), ('match_date', 'U200'), 
-                ('player_id', 'i4'), ('teammate_id', 'i4'), ('team_id', 'U200'), ('opponent1_id', 'i4'), ('opponent2_id', 'i4'), 
-                ('opponent_team_id', 'U200'), ('win', '?'), ('team_score', 'i4'), ('opponent_score', 'i4'), ('incomplete_score', '?'), 
-                ('required_score', 'i4'), ('score_differential', 'i4'), ('pct_points_won', 'f4'), ('winning_score', 'i4'), ('latitude', 'f4'), 
-                ('longitude', 'f4'), ('time_zone', 'U200')]
+                ('series_number', 'i4'), ('match_type', 'U200'), ('isMatch', '?'), ('match_date', 'U200'), ('player_id', 'i4'), 
+                ('teammate_id', 'i4'), ('team_id', 'U200'), ('opponent1_id', 'i4'), ('opponent2_id', 'i4'), ('opponent_team_id', 'U200'), 
+                ('win', '?'), ('team_score', 'i4'), ('opponent_score', 'i4'), ('incomplete_score', '?'), ('required_score', 'i4'), 
+                ('score_differential', 'i4'), ('pct_points_won', 'f4'), ('winning_score', 'i4'), ('latitude', 'f4'), ('longitude', 'f4'), 
+                ('time_zone', 'U200'), ('datetime', 'M')]
+                #,('date', 'datetime64[s]'),('time', 'datetime64[s]')]
 
 #Data Type Verification before creating array (prints all unique data types found in every column compared to defined type)
-for i in range(27):
+for i in range(len(clean_vball_games_tuples[0])):
     holder=[]
-    for j in range(173080):
+    for j in range(len(clean_vball_games_tuples)):
         test=type(clean_vball_games_tuples[j][i])
         if len(holder)==0:
             holder.append(test)
@@ -168,6 +177,43 @@ for i in range(27):
 
 #Store structured array in vball
 vball=np.array(clean_vball_games_tuples, dtype=vball_coltypes)
+
+##Create a date/time array and merge
+#Import built in datetime package
+
+#Example of how date time works
+#Strptime parses the time value based on a consistent format (This is faster than packages that guess format)
+vball['match_date'][0]
+test=dt.strptime(vball['match_date'][0],'%Y-%m-%dT%H:%M:%S%z')
+dt.date(test)
+dt.time(test)
+dt.tzname(test)
+
+#Loop to create list of [datetime,date,time] in separate columns
+dt_datetime=[]
+dt_date=[]
+dt_time=[]
+for i in range(vball.shape[0]):
+    dt_holder=dt.strptime(vball['match_date'][i],'%Y-%m-%dT%H:%M:%S%z')
+    dt_datetime.append(dt_holder)
+    dt_date.append(dt.date(dt_holder))
+    dt_time.append(dt.time(dt_holder))
+parsed_dt=[dt_datetime,dt_date,dt_time]
+
+#Dates go from July 2018 to December 2021
+#Dates beyond today recorded Counter({datetime.date(2042, 2, 9): 5776, datetime.date(2042, 2, 10): 2936})
+min(parsed_dt[0])
+max(parsed_dt[0])
+max([x for x in parsed_dt[0] if x<=dt.date.today()])
+Counter([x for x in parsed_dt[0] if x>dt.date.today()])
+
+#All dates came in the UTC universal time zone. This is list of the actual time zones from the data.
+#We may need to consider this later if looking at day/night or weather
+Counter([x for x in vball['time_zone']])
+
+date_array=np.array(parsed_dt)
+vball2=np.hstack((vball,date_array))
+vball.shape
 
 #Equivalent output in a structured array
 vball['tournament_name'][1]
