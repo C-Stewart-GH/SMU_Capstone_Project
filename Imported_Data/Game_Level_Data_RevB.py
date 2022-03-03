@@ -33,8 +33,7 @@ clean_vball_data = copy.deepcopy(full_vball_data)
 clean_vball_data[0]["divisions"][0]['googleLocation'][0]
 clean_vball_data[0]['tournament']
 clean_vball_data[0].keys()
-clean_vball_data[0]["divisions"][0]['timeZoneName']
-
+clean_vball_data[0]["divisions"][0]
 
 # Change playerProfileIds to playerIds for consistency and count number of changes
 # After filtering for 'Girls' and 'Juniors' there are no changes needed
@@ -185,3 +184,5 @@ vball[['tournament_name','type']][1]
 #     db.gameOver(home_team, away_team, True)
 # if match.get("games")[-1].get("winner") == "away":
 #     db.gameOver(away_team, home_team, 0)
+
+len(set(vball['tournament_name']))

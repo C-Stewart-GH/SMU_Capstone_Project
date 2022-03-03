@@ -70,8 +70,10 @@ for i in range(len(full_vball_data)):
         for z in range(len(full_vball_data[i]["divisions"][j]["matches"])):
             temp = list(full_vball_data[i]["divisions"][j]["matches"][z].keys())
             holder.extend(temp)
-
+                
 Counter(holder)
+
+
 
 # Look at number of games within each match. Consider bracket/pool play and isMatch = T/F
 
