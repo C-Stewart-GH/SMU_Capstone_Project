@@ -1,5 +1,6 @@
 import json
 import os
+from pickle import TRUE
 import numpy as np
 from elosports.elo import Elo
 from collections import Counter
@@ -7,7 +8,7 @@ from datetime import datetime as dt
 
 # Read in path names into a list
 directory = os.fsencode(
-    "/Users/cameron/Documents/SMU_DS/Capstone/SMU_Capstone_Project/Raw Data/Match Data/"
+    "/Users/mmaze/Desktop/GitHub/SMU_Capstone_Project/Raw Data/Match Data/"
 )
 file_path_holder = []
 for file in os.listdir(directory):
@@ -168,20 +169,177 @@ vball[1]['tournament_name']
 #Calling multiple fields
 vball[['tournament_name','type']][1]
 
-# #Try out new np array on Michael's Elo algo
-# db = Elo(k = 20)
 
-# db.addPlayer(home_team)
-# db.addPlayer(away_team)
-# db.gameOver(home_team, away_team, True)
-# len(db.ratingDict)
-# min(db.ratingDict.values())
-# sum(db.ratingDict.values())/len(db.ratingDict.values())
-# max(db.ratingDict.values())
 
-# db.ratingDict.values()
 
-# if match.get("games")[-1].get("winner") == "home": # -1 bc we assume the last winner listed won the overall match
-#     db.gameOver(home_team, away_team, True)
-# if match.get("games")[-1].get("winner") == "away":
-#     db.gameOver(away_team, home_team, 0)
+
+# ELO
+
+train = vball[:int(len(vball)*.9)]
+test = vball[int(len(vball)*.9):]
+
+# https://www.geeksforgeeks.org/elo-rating-algorithm/
+import math
+
+def KFactor(games_played):
+    return 10 + 30/(games_played**(2/3))
+
+def Probability(rating1, rating2):
+    return 1.0 * 1.0 / (1 + 1.0 * math.pow(10, 1.0 * (rating1 - rating2) / 400))
+# example:
+Probability(1200, 1000)
+
+def EloRating(Ra, Rb, K, won):
+    # Probability of Player A
+    Pa = Probability(Rb, Ra)
+    # Case When Player A wins
+    if (won) :
+        Ra = Ra + K * (1 - Pa)
+    # Case When Player A loses
+    else :
+        Ra = Ra + K * (0 - Pa)
+    return(round(Ra, 4))
+
+elo_db = dict()
+
+for match in train:
+    # add players to database if needed:
+    for person in ["player_id", "teammate_id", "opponent1_id", "opponent2_id"]:
+        if match[person] not in elo_db.keys():
+            elo_db.update({match[person]: [1200, 0]})
+
+    # set parameters    
+    avg_oppon = .5 * (elo_db.get(match["opponent1_id"])[0] + elo_db.get(match["opponent2_id"])[0])
+    player_elo = elo_db.get(match["player_id"])[0]
+    games_played = elo_db.get(match["player_id"])[1] + 1
+
+    # perform calculations/updates
+    new_elo = EloRating(player_elo, avg_oppon, KFactor(games_played), match["win"])
+    elo_db.update({match["player_id"]: [new_elo, games_played]})
+
+correct_counter = 0
+incorrect_counter = 0
+
+for match in test:
+    # add players to database if needed:
+    for person in ["player_id", "teammate_id", "opponent1_id", "opponent2_id"]:
+        if match[person] not in elo_db.keys():
+            elo_db.update({match[person]: [1200, 0]})
+    # set parameters     
+    avg_oppon = .5 * (elo_db.get(match["opponent1_id"])[0] + elo_db.get(match["opponent2_id"])[0])
+    player_elo = elo_db.get(match["player_id"])[0]
+    games_played = elo_db.get(match["player_id"])[1] + 1
+
+    # skip over situations where both players are unranked or have same elo
+    if player_elo == avg_oppon:
+        continue
+
+    # compare preds to actual
+    if Probability(player_elo, avg_oppon) < .5:
+        pred_win = True
+    else:
+        pred_win = False
+
+    if pred_win == match["win"]:
+        correct_counter += 1
+    else:
+        incorrect_counter += 1
+
+    # perform calculations/updates
+    new_elo = EloRating(player_elo, avg_oppon, KFactor(games_played), match["win"])
+    elo_db.update({match["player_id"]: [new_elo, games_played]})
+
+# accuracy:
+correct_counter / (correct_counter + incorrect_counter)
+
+
+
+# repeating the above steps except with a function
+def simulator(train, test, k_alg):
+
+    elo_db = dict()
+
+    for match in train:
+        # add players to database if needed:
+        for person in ["player_id", "teammate_id", "opponent1_id", "opponent2_id"]:
+            if match[person] not in elo_db.keys():
+                elo_db.update({match[person]: [1200, 0]})
+
+        # set parameters    
+        avg_oppon = .5 * (elo_db.get(match["opponent1_id"])[0] + elo_db.get(match["opponent2_id"])[0])
+        player_elo = elo_db.get(match["player_id"])[0]
+        games_played = elo_db.get(match["player_id"])[1] + 1
+
+        # perform calculations/updates
+        new_elo = EloRating(player_elo, avg_oppon, k_alg(games_played), match["win"])
+        elo_db.update({match["player_id"]: [new_elo, games_played]})
+
+    correct_counter = 0
+    incorrect_counter = 0
+
+    for match in test:
+        # add players to database if needed:
+        for person in ["player_id", "teammate_id", "opponent1_id", "opponent2_id"]:
+            if match[person] not in elo_db.keys():
+                elo_db.update({match[person]: [1200, 0]})
+        # set parameters     
+        avg_oppon = .5 * (elo_db.get(match["opponent1_id"])[0] + elo_db.get(match["opponent2_id"])[0])
+        player_elo = elo_db.get(match["player_id"])[0]
+        games_played = elo_db.get(match["player_id"])[1] + 1
+
+        # skip over situations where both players are unranked or have same elo
+        if player_elo == avg_oppon:
+            continue
+
+        # compare preds to actual
+        if Probability(player_elo, avg_oppon) < .5:
+            pred_win = True
+        else:
+            pred_win = False
+
+        if pred_win == match["win"]:
+            correct_counter += 1
+        else:
+            incorrect_counter += 1
+
+        # perform calculations/updates
+        new_elo = EloRating(player_elo, avg_oppon, k_alg(games_played), match["win"])
+        elo_db.update({match["player_id"]: [new_elo, games_played]})
+
+    accuracy = round(100 * correct_counter / (correct_counter + incorrect_counter), 2)
+    return(accuracy)
+
+
+
+def KFactor(games_played): 
+    return 40
+simulator(train, test, KFactor)
+
+def KFactor(games_played): 
+    return(10)
+simulator(train, test, KFactor)
+
+def KFactor(games_played): 
+    return 10 + 40/(games_played**(1/10))
+simulator(train, test, KFactor)
+
+def KFactor(games_played): 
+    return 10 + 30/(games_played**(1/4))
+simulator(train, test, KFactor)
+
+def KFactor(games_played): 
+    return 10 + 30/(games_played**(1/2))
+simulator(train, test, KFactor)
+
+def KFactor(games_played): 
+    return 10 + 30/(games_played**(2/3))
+simulator(train, test, KFactor)
+
+def KFactor(games_played): 
+    return 10 + 30/(games_played**(9/10))
+simulator(train, test, KFactor)
+
+# Reminders:
+# If opponent played in less than 5 games, consider using a lower k factor since confidence is lower
+# Implement CV
+# Change accuracy metric to log loss
