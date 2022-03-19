@@ -4,6 +4,9 @@ import numpy as np
 from elosports.elo import Elo
 from collections import Counter
 from datetime import datetime as dt
+import copy
+
+
 
 # Read in path names into a list
 directory = os.fsencode(
@@ -28,12 +31,12 @@ for path in file_path_holder:
 
 # Copy original data to file that will be cleaned
 # IMPORTANT: Need deepcopy due to nested nature of data (copy will cause issues because it is meant for shallow objects)
-import copy
 clean_vball_data = copy.deepcopy(full_vball_data)
 
 #I am parsing one example to check what is new and what is the same from the update
 #No comment means the same
 clean_vball_data[0].keys() #tournament, type, and division
+clean_vball_data[0]['tournamentId'] #Added tournamentId
 clean_vball_data[0]['tournament']
 clean_vball_data[0]['type']
 
@@ -64,9 +67,9 @@ for tournaments in clean_vball_data:
                     matches["playerProfileIds"] = matches.pop("playerIds")
 len(key_changes)
 
-# 53,851 games for 'Girls' and 'Juniors' that are 2 vs 2
-# Warning: matches are missing or unrealistic scores and can be filled in with just a win or loss input
-# 215,404 rows recorded (each game appears 4 times)
+#Create dataframe-like set in array
+# Warning: matches with missing or unrealistic scores and can be filled in with just a win or loss input
+# Each game appears 4 times
 clean_vball_games = []
 for tournaments in clean_vball_data:
     for divisions in tournaments.get("divisions"):
@@ -101,13 +104,18 @@ for tournaments in clean_vball_data:
                                 opponent_check_index-=1
                                 for player in side:
                                     row_holder= []
+                                    row_holder.append(tournaments.get('tournamentId'))  #tournamentId
                                     row_holder.append(tournaments.get('tournament'))    #Tournament Name
                                     row_holder.append(tournaments.get('type'))          #Type (Local or National)
                                     row_holder.append(divisions.get('division'))        #Division
+                                    row_holder.append(divisions.get('divisionId'))      #divisionId
                                     row_holder.append(divisions.get('gender'))          #Gender
                                     row_holder.append(divisions.get('ageType'))         #Age Type
                                     row_holder.append(matches.get('id'))                #Match Id
-                                    row_holder.append(game_number)                      #Game Number in Series
+                                    row_holder.append(matches.get('roundNumber'))       #roundNumber (in tournament)               
+                                    row_holder.append(matches.get('matchNumber'))       #matchNumber (in round)
+                                    row_holder.append(matches.get('matchWinner'))       #matchWinner (Match not game winner)
+                                    row_holder.append(games.get('gameNumber'))          #series_number (in set of games of a match)
                                     row_holder.append(matches.get('type'))              #Match Type (Pool or Bracket)
                                     row_holder.append(matches.get('isMatch'))           #Best of Match (T/F Is the match a best of 3, 5, or 7)
                                     row_holder.append(player)                           #Player ID
@@ -127,6 +135,7 @@ for tournaments in clean_vball_data:
                                         row_holder.append(str(player_holder[1][0])+'.'+str(player_holder[1][1]))
                                         
                                     row_holder.append(side_check==games.get('winner'))  #Game Win (T/F)
+                                    row_holder.append(games.get('winLoss'))             #ignored_score
                                     row_holder.append(games.get(side_check))            #Team Score
                                     row_holder.append(games.get(opponent_check))        #Opponent Score
                                     row_holder.append(max(games.get(side_check),games.get(opponent_check))<10) #Incomplete Score
@@ -153,32 +162,45 @@ len(clean_vball_games)
 clean_vball_games_tuples=[tuple(clean_vball_games[i]) for i in range(len(clean_vball_games))]
 
 #Find proper datatype for datetime column
-np.datetime64(clean_vball_games_tuples[0][26]).dtype
+np.datetime64(clean_vball_games_tuples[0][-1]).dtype
 
 #Set up data structure for structured array
 #U200 = string of 200 characters
 #i4 = 32 bit integer
 #f4 = 32 bit float
-#M = datetime format
-vball_coltypes=[('tournament_name','U200'), ('type', 'U200'), ('division', 'U200'), ('gender', 'U200'), ('age_type', 'U200'), 
-                ('series_number', 'i4'), ('match_type', 'U200'), ('isMatch', '?'), ('match_date', 'U200'), ('player_id', 'i4'), 
+#M = datetime format 
+vball_coltypes=[('tournamentId', 'i4'), ('tournament_name','U200'), ('type', 'U200'), ('division', 'U200'), ('divisionId', 'U200'), ('gender', 'U200'), ('age_type', 'U200'), ('match_id', 'i4'),
+                ('roundNumber', 'i4'), ('matchNumber', 'i4'), ('matchWinner', 'U200'), ('series_number', 'i4'), ('match_type', 'U200'), ('isMatch', '?'), ('player_id', 'i4'), 
                 ('teammate_id', 'i4'), ('team_id', 'U200'), ('opponent1_id', 'i4'), ('opponent2_id', 'i4'), ('opponent_team_id', 'U200'), 
-                ('win', '?'), ('team_score', 'i4'), ('opponent_score', 'i4'), ('incomplete_score', '?'), ('required_score', 'i4'), 
+                ('win', '?'), ('ignored_score', '?'), ('team_score', 'i4'), ('opponent_score', 'i4'), ('incomplete_score', '?'), ('required_score', 'i4'), 
                 ('score_differential', 'i4'), ('pct_points_won', 'f4'), ('winning_score', 'i4'), ('latitude', 'f4'), ('longitude', 'f4'), 
                 ('time_zone', 'U200'), ('datetime', '<M8[us]')]
 
 #Store structured array in vball
 vball=np.array(clean_vball_games_tuples, dtype=vball_coltypes)
+len(vball)
 
 #Sort by date (Final Array)
 vball.sort(order='datetime')
 
-#Equivalent output in a structured array
-vball['tournament_name'][1]
-vball[1]['tournament_name']
+#Remove dates past today
+vball=vball[vball['datetime']<dt.now()]
+len(vball)
 
-#Calling multiple fields
-vball[['tournament_name','type']][1]
+# #Equivalent output in a structured array
+# vball['tournament_name'][1] #This is better because multi-input for column must go first
+# vball[1]['tournament_name']
+
+# #Calling multiple fields
+# vball[['tournament_name','type']][1]
 
 #Total Tournaments in data set
 len(set(vball['tournament_name']))
+
+# #Used to track date errors past today. Need to run this function before they are filtered out if you want use the below code
+# error_2042=vball[['tournament_name','divisionId','match_id','datetime']][vball['datetime']>dt.now()]
+# len(set([t+'//'+id for t,id in error_2042[['tournament_name','divisionId']]]))
+# len(set(error_2042['tournament_name']))
+# [x for x in error_2042[['tournament_name','divisionId']][0:10]]
+# set([t+'//'+id for t,id in error_2042[['tournament_name','divisionId']]])
+# error_2042[::200]
