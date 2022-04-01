@@ -31,45 +31,9 @@ for path in file_path_holder:
 
 # Copy original data to file that will be cleaned
 # IMPORTANT: Need deepcopy due to nested nature of data (copy will cause issues because it is meant for shallow objects)
-import copy
 clean_vball_data = copy.deepcopy(full_vball_data)
 
-#I am parsing one example to check what is new and what is the same from the update
-#No comment means the same
-clean_vball_data[0].keys() #tournament, type, and division
-clean_vball_data[0]['tournament']
-clean_vball_data[0]['type']
-
-clean_vball_data[0]["divisions"][0].keys()
-clean_vball_data[0]["divisions"][0]['division']
-clean_vball_data[0]["divisions"][0]['divisionId'] #Added divisionId
-clean_vball_data[0]["divisions"][0]['gender']
-clean_vball_data[0]["divisions"][0]['ageType']
-clean_vball_data[0]["divisions"][0]['latitude']
-clean_vball_data[0]["divisions"][0]['longitude']
-clean_vball_data[0]["divisions"][0]['timeZoneName']
-clean_vball_data[0]["divisions"][0]['googleLocation'][0] #Need to understand this better if we use location
-clean_vball_data[0]["divisions"][0]['matches'][200] #Added roundNumber, matchNumber, matchWinner
-clean_vball_data[0]["divisions"][0]['matches'][0]['games'][0] #Added gameNumber, winLoss
-clean_vball_data[10]["divisions"][2]['matches'][0]['playerProfileIds']
-
-# Change playerIds to playerProfileIds to  for consistency and count number of changes
-# There are no changes needed, all were fixed to playerProfileIds in this update
-key_changes=[]
-for tournaments in clean_vball_data:
-    for divisions in tournaments.get("divisions"):
-        if (divisions.get("gender") == "Girls") and (
-            divisions.get("ageType") == "Juniors"
-        ):
-            for matches in divisions.get("matches"):
-                if "playerIds" in matches.keys():
-                    key_changes.append(matches)
-                    matches["playerProfileIds"] = matches.pop("playerIds")
-len(key_changes)
-
-# 53,851 games for 'Girls' and 'Juniors' that are 2 vs 2
-# Warning: matches are missing or unrealistic scores and can be filled in with just a win or loss input
-# 215,404 rows recorded (each game appears 4 times)
+#Create dataframe-like set in array
 clean_vball_games = []
 for tournaments in clean_vball_data:
     for divisions in tournaments.get("divisions"):
@@ -104,13 +68,18 @@ for tournaments in clean_vball_data:
                                 opponent_check_index-=1
                                 for player in side:
                                     row_holder= []
+                                    row_holder.append(tournaments.get('tournamentId'))  #tournamentId
                                     row_holder.append(tournaments.get('tournament'))    #Tournament Name
                                     row_holder.append(tournaments.get('type'))          #Type (Local or National)
                                     row_holder.append(divisions.get('division'))        #Division
+                                    row_holder.append(divisions.get('divisionId'))      #divisionId
                                     row_holder.append(divisions.get('gender'))          #Gender
                                     row_holder.append(divisions.get('ageType'))         #Age Type
                                     row_holder.append(matches.get('id'))                #Match Id
-                                    row_holder.append(game_number)                      #Game Number in Series
+                                    row_holder.append(matches.get('roundNumber'))       #roundNumber (in tournament)               
+                                    row_holder.append(matches.get('matchNumber'))       #matchNumber (in round)
+                                    row_holder.append(matches.get('matchWinner'))       #matchWinner (Match not game winner)
+                                    row_holder.append(games.get('gameNumber'))          #series_number (in set of games of a match)
                                     row_holder.append(matches.get('type'))              #Match Type (Pool or Bracket)
                                     row_holder.append(matches.get('isMatch'))           #Best of Match (T/F Is the match a best of 3, 5, or 7)
                                     row_holder.append(player)                           #Player ID
@@ -130,6 +99,7 @@ for tournaments in clean_vball_data:
                                         row_holder.append(str(player_holder[1][0])+'.'+str(player_holder[1][1]))
                                         
                                     row_holder.append(side_check==games.get('winner'))  #Game Win (T/F)
+                                    row_holder.append(games.get('winLoss'))             #ignored_score
                                     row_holder.append(games.get(side_check))            #Team Score
                                     row_holder.append(games.get(opponent_check))        #Opponent Score
                                     row_holder.append(max(games.get(side_check),games.get(opponent_check))<10) #Incomplete Score
@@ -155,41 +125,118 @@ len(clean_vball_games)
 ##Covert to list of tuples (for structured array later)
 clean_vball_games_tuples=[tuple(clean_vball_games[i]) for i in range(len(clean_vball_games))]
 
-#Find proper datatype for datetime column
-np.datetime64(clean_vball_games_tuples[0][26]).dtype
-
 #Set up data structure for structured array
 #U200 = string of 200 characters
 #i4 = 32 bit integer
 #f4 = 32 bit float
-#M = datetime format
-vball_coltypes=[('tournament_name','U200'), ('type', 'U200'), ('division', 'U200'), ('gender', 'U200'), ('age_type', 'U200'), 
-                ('series_number', 'i4'), ('match_type', 'U200'), ('isMatch', '?'), ('match_date', 'U200'), ('player_id', 'i4'), 
+#M = datetime format 
+vball_coltypes=[('tournamentId', 'i4'), ('tournament_name','U200'), ('type', 'U200'), ('division', 'U200'), ('divisionId', 'U200'), ('gender', 'U200'), ('age_type', 'U200'), ('match_id', 'i4'),
+                ('roundNumber', 'i4'), ('matchNumber', 'i4'), ('matchWinner', 'U200'), ('series_number', 'i4'), ('match_type', 'U200'), ('isMatch', '?'), ('player_id', 'i4'), 
                 ('teammate_id', 'i4'), ('team_id', 'U200'), ('opponent1_id', 'i4'), ('opponent2_id', 'i4'), ('opponent_team_id', 'U200'), 
-                ('win', '?'), ('team_score', 'i4'), ('opponent_score', 'i4'), ('incomplete_score', '?'), ('required_score', 'i4'), 
+                ('win', '?'), ('ignored_score', '?'), ('team_score', 'i4'), ('opponent_score', 'i4'), ('incomplete_score', '?'), ('required_score', 'i4'), 
                 ('score_differential', 'i4'), ('pct_points_won', 'f4'), ('winning_score', 'i4'), ('latitude', 'f4'), ('longitude', 'f4'), 
                 ('time_zone', 'U200'), ('datetime', '<M8[us]')]
 
 #Store structured array in vball
 vball=np.array(clean_vball_games_tuples, dtype=vball_coltypes)
+len(vball)
 
 #Sort by date (Final Array)
 vball.sort(order='datetime')
 
+#Remove dates past today
+vball=vball[vball['datetime']<dt.now()]
+len(vball)
 
 #Create TrueSkill Through Time Implementation
 
 #Default player parameters
 #Player(Gaussian(mu=0.000, sigma=6.000), beta=1.000, gamma=0.030)
 
-#Initialize every player into a dictionary
+#Count number of unique players
+len(set(vball['player_id']))
 
-unique_players=np.unique(vball['player_id'])
-player_ratings=dict()
-for i in unique_players:
-    player_ratings[i]=ttt.Player()
-    
-len(list(player_ratings.items()))
+#Count players with at least 5 games
+game_counts=[v for k,v in Counter(vball['player_id']).items() if v>=5]
+len(game_counts)
+
+#Capture player ids with at least 5 games
+common_players=[k for k,v in Counter(vball['player_id']).items() if v>=5]
+len(game_counts)
+
+for i in vball[::4]:
+    if (
+        vball['player_id'] in common_players) &
+    (vball['teammate_id'] in common_players) 
+
+
+#Initialize every player into a dictionary
+def initialize_players(mu_val=0.0,sigma_val=6.0,beta_val=1.0,gamma_val=0.03):
+    unique_players=np.unique(vball['player_id'])
+    player_ratings=dict()
+    for i in unique_players:
+        player_ratings[i]=ttt.Player(ttt.Gaussian(mu=mu_val, sigma=sigma_val),beta=beta_val,gamma=gamma_val)
+    return player_ratings
+        
+def run_simulation(train_size=20000,mu_val=0.0,sigma_val=6.0,beta_val=1.0,gamma_val=0.03):
+    initialize_players(mu_val,sigma_val,beta_val,gamma_val)
+
+    final_acc=[]
+        #Run through every match and update mu and sigma after
+        #Looping through every 4th row because the algorithm takes the both teams at once
+        loop=0
+        prediction=[]
+        for i in vball[::4]:
+            ##First step is to store winning and losing team
+            if i['win']==True:
+                winning_team = [player_ratings[i['player_id']], player_ratings[i['teammate_id']]]
+                losing_team = [player_ratings[i['opponent1_id']], player_ratings[i['opponent2_id']]]
+            if i['win']==False:
+                losing_team = [player_ratings[i['player_id']], player_ratings[i['teammate_id']]]
+                winning_team = [player_ratings[i['opponent1_id']], player_ratings[i['opponent2_id']]]    
+
+            #Next step is to generate a new mu and sigma for every player based on the result
+            g = ttt.Game([winning_team, losing_team]) #Winning team must go first
+            pos=g.posteriors()
+            
+            loop+=1
+            if loop > train_size:
+                if g.evidence > .5:
+                    prediction.append(1)
+                elif g.evidence == .5:
+                    prediction.append(0)
+                else:
+                    prediction.append(-1)
+
+            #Next we store the new mu and sigma into the player rating dictionary
+            if i['win']==True:
+                player_ratings[i['player_id']]=ttt.Player(pos[0][0])
+                player_ratings[i['teammate_id']]=ttt.Player(pos[0][1])
+                player_ratings[i['opponent1_id']]=ttt.Player(pos[1][0])
+                player_ratings[i['opponent2_id']]=ttt.Player(pos[1][1])
+            if i['win']==False:
+                player_ratings[i['player_id']]=ttt.Player(pos[1][0])
+                player_ratings[i['teammate_id']]=ttt.Player(pos[1][1])
+                player_ratings[i['opponent1_id']]=ttt.Player(pos[0][0])
+                player_ratings[i['opponent2_id']]=ttt.Player(pos[0][1])
+
+        hits=len([x for x in prediction if x==1])
+        misses=len([x for x in prediction if x==-1])
+        ties=len([x for x in prediction if x==0])
+        acc=hits/(hits+misses)
+        return acc
+        
+    final_acc.append([sigma_size,round(acc,4)])
+    final_acc
+    #plt.clf()
+    plt.plot([x[0] for x in final_acc], [x[1] for x in final_acc])
+    plt.xticks([x[0] for x in final_acc])  # add this or the plot api will add extra ticks
+    #plt.xticks(rotation=90)
+    plt.xlabel("Sigma Size")
+    plt.ylabel("Accuracy")
+    plt.title("Accuracy by Sigma Size (train=16K Matches=43270 Matches)")
+    plt.show()
+    max([x[1] for x in final_acc])
 
 #Run through every match and update mu and sigma after
 #Looping through every 4th row because the algorithm takes the both teams at once

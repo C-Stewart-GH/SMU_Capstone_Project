@@ -5,6 +5,8 @@ from elosports.elo import Elo
 from collections import Counter
 from datetime import datetime as dt
 import copy
+import pickle
+import bz2
 
 
 
@@ -196,6 +198,15 @@ len(vball)
 
 #Total Tournaments in data set
 len(set(vball['tournament_name']))
+len(set(vball['player_id']))
+
+#Pickle and then use BZ2 compression to reduce to (2.2 MB)
+with bz2.BZ2File('Pickle_Files/vball_game_data.pbz2', 'wb') as file:
+    pickle.dump(vball, file, protocol=pickle.HIGHEST_PROTOCOL)
+    
+#Way too large to save to traditional pickle file (>1 GB). DO NOT USE THIS. Kept as an example
+# with open('vball_game_data.pickle', 'wb') as handle:
+#     pickle.dump(vball, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 # #Used to track date errors past today. Need to run this function before they are filtered out if you want use the below code
 # error_2042=vball[['tournament_name','divisionId','match_id','datetime']][vball['datetime']>dt.now()]
