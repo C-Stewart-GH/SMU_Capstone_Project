@@ -8,8 +8,6 @@ import copy
 import pickle
 import bz2
 
-
-
 # Read in path names into a list
 directory = os.fsencode(
     "/Users/cameron/Documents/SMU_DS/Capstone/SMU_Capstone_Project/Raw Data/Match Data/"
