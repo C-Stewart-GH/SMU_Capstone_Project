@@ -191,29 +191,10 @@ acc,outputs=run_simulation(vball=vball,train_size=30000,mu_val=0,sigma_val=2.5,b
 
 #Outputs contain: Binary Outcome, WT avg mu, LT avg mu, WT skill gap, LT skill gap, % points won, and % chance of winning
 #Understand skill range and gap range
+out_array_labels=['game_outcome', 'WT avg mu', 'LT avg mu', 'WT skill gap', 'LT skill gap',' % points won', '% win estimate']
 out_array=np.array(outputs)
 out_array.shape
 out_array[0]
-
-#WT mu
-max(out_array[:,1])
-min(out_array[:,1])
-
-#LT mu
-max(out_array[:,2])
-min(out_array[:,2])
-
-#WT skill gap
-max(out_array[:,3])
-min(out_array[:,3])
-
-#LT skill gap
-max(out_array[:,4])
-min(out_array[:,4])
-
-#WT % chance of winning
-max(out_array[:,6])
-min(out_array[:,6])
 
 #Visualize Data
 import seaborn as sns
@@ -262,6 +243,7 @@ plt.show()
 
 #Outputs contain: Binary Outcome, WT avg mu, LT avg mu, WT skill gap, LT skill gap, % points won, and % chance of winning
 
+
 #Count of games between winning and losing team
 sns.histplot(
     out_array, x=out_array[:,1], y=out_array[:,2],
@@ -272,6 +254,7 @@ plt.xlabel('WT Rating')
 plt.ylabel('LT Rating')
 plt.title('Count of LT vs WT Ratings')
 plt.show()
+
 
 #Plot heatmap from array
 plt.clf()  # For clearing plot
@@ -295,3 +278,132 @@ ax = sns.heatmap(df_X)
 np_holder=out_array[:,[1,2,0]]
 sns.heatmap(out_array[:,1]-out_array[:,2],out_array[:,6])
 plt.show()
+
+
+#Outputs contain: Binary Outcome, WT avg mu, LT avg mu, WT skill gap, LT skill gap, % points won, and % chance of winning
+out_array=np.array(outputs)
+out_array.shape
+
+#Remove ties
+out_array_no_ties=out_array[out_array[:,0]!=0,:]
+out_array_no_ties.shape
+
+#Create bins
+lb=-4
+ub=4
+increment=.25
+bins_lt=[[round(x*.01,2),round(x*.01+increment,2)] for x in range(int(lb*100),int(ub*100),int(increment*100))]
+bins_wt=bins_lt.copy()
+bins_wt.reverse()
+
+
+game_count_array=np.zeros((len(bins_wt),len(bins_lt)))
+exp_win_prob_array=np.zeros((len(bins_wt),len(bins_lt)))
+actual_win_prob=np.zeros((len(bins_wt),len(bins_lt)))
+
+
+#Capture game count in each bin (after training)
+for i in out_array_no_ties:
+    for ix,x in enumerate(bins_wt):
+        for iy,y in enumerate(bins_lt):
+            if x[0]<=i[1]<x[1] and y[0]<=i[2]<y[1]:
+                game_count_array[ix,iy]+=1
+
+#Capture expected win probability
+for i in out_array_no_ties:
+    for ix,x in enumerate(bins_wt):
+        for iy,y in enumerate(bins_lt):
+            if x[0]<=i[1]<x[1] and y[0]<=i[2]<y[1]:
+                exp_win_prob_array[ix,iy]+=i[6]/game_count_array[ix,iy]
+
+#Capture actual win probability
+for i in out_array_no_ties:
+    for ix,x in enumerate(bins_wt):
+        for iy,y in enumerate(bins_lt):
+            if x[0]<=i[1]<x[1] and y[0]<=i[2]<y[1] and i[0]==1:
+                actual_win_prob[ix,iy]+=i[0]/game_count_array[ix,iy]
+
+#Capture residual of actual - expected win probability
+residual_win_prob=actual_win_prob-exp_win_prob_array
+
+#Plot heatmap of game count
+plt.clf()  # For clearing plot
+sns.heatmap(
+    game_count_array,
+    cmap="Blues",
+    xticklabels=bins_lt,
+    yticklabels=bins_wt,
+    linewidth=0.5,
+)
+plt.xlabel("LT")
+plt.ylabel("WT")
+plt.title("Game Count")
+plt.tight_layout()
+plt.show()
+
+#Plot heatmap of expected win probability
+plt.clf()  # For clearing plot
+sns.heatmap(
+    exp_win_prob_array,
+    cmap="RdBu",
+    xticklabels=bins_lt,
+    yticklabels=bins_wt,
+    linewidth=0.5,
+)
+plt.xlabel("LT")
+plt.ylabel("WT")
+plt.title("Expected Win Probability")
+plt.tight_layout()
+plt.show()
+
+#Plot heatmap of actual win probability
+plt.clf()  # For clearing plot
+sns.heatmap(
+    actual_win_prob,
+    cmap="RdBu",
+    xticklabels=bins_lt,
+    yticklabels=bins_wt,
+    linewidth=0.5,
+)
+plt.xlabel("LT")
+plt.ylabel("WT")
+plt.title("Actual Win Probability")
+plt.tight_layout()
+plt.show()
+
+#Plot heatmap of residual win probability
+plt.clf()  # For clearing plot
+sns.heatmap(
+    residual_win_prob,
+    cmap="RdBu",
+    xticklabels=bins_lt,
+    yticklabels=bins_wt,
+    linewidth=0.5,
+)
+plt.xlabel("LT")
+plt.ylabel("WT")
+plt.title("Residual Win Probability")
+plt.tight_layout()
+plt.show()
+
+
+#Min and max of key features
+#WT mu
+max(out_array[:,1])
+min(out_array[:,1])
+
+#LT mu
+max(out_array[:,2])
+min(out_array[:,2])
+
+#WT skill gap
+max(out_array[:,3])
+min(out_array[:,3])
+
+#LT skill gap
+max(out_array[:,4])
+min(out_array[:,4])
+
+#WT % chance of winning
+max(out_array[:,6])
+min(out_array[:,6])
